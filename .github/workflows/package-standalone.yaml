@@ -31,6 +31,12 @@ jobs:
       - name: Install native module build dependencies
         run: sudo apt update && sudo apt install -y libkrb5-dev
 
+      - name: Install nfpm
+        run: |
+          mkdir -p ~/.local/bin
+          curl -sSfL https://github.com/goreleaser/nfpm/releases/download/v2.3.1/nfpm_2.3.1_$(uname -s)_$(uname -m).tar.gz | tar -C ~/.local/bin -zxv nfpm
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - run: SKIP_SUBMODULE_DEPS=1 npm ci
 
       - name: Download npm package
