@@ -51,6 +51,9 @@ jobs:
 
       - run: npm run release:standalone
 
+      - name: Rebuild native modules for Linux
+        run: cd release-standalone && npm rebuild
+
       - name: Replace node with linux-x64
         run: |
           node_version=$(node --version)
