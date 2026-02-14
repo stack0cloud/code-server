@@ -76,7 +76,7 @@ jobs:
           ls -lh "$TARBALL"
           tar -tzf "$TARBALL" | grep 'bin/code-server'
           # Verify bundled node is Linux x64
-          tar -xzf "$TARBALL" --include='*/lib/node' -C /tmp
+          tar -xzf "$TARBALL" --wildcards '*/lib/node' -C /tmp
           file /tmp/*/lib/node
 
       - name: Upload to release
