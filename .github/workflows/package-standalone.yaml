@@ -28,6 +28,9 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      - name: Install native module build dependencies
+        run: sudo apt update && sudo apt install -y libkrb5-dev
+
       - run: SKIP_SUBMODULE_DEPS=1 npm ci
 
       - name: Download npm package
