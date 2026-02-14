@@ -1,0 +1,86 @@
+name: Package linux-amd64
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to attach the package to"
+        required: true
+      npm_package_url:
+        description: "URL to the npm release package.tar.gz (optional, downloads from release tag if empty)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: SKIP_SUBMODULE_DEPS=1 npm ci
+
+      - name: Download npm package
+        run: |
+          gh release download "${{ inputs.release_tag }}" \
+            --pattern "package.tar.gz" \
+            --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: tar -xzf package.tar.gz
+
+      - run: npm run release:standalone
+
+      - name: Replace node with linux-x64
+        run: |
+          node_version=$(node --version)
+          wget -q "https://nodejs.org/dist/${node_version}/node-${node_version}-linux-x64.tar.xz"
+          tar -xf "node-${node_version}-linux-x64.tar.xz" \
+            "node-${node_version}-linux-x64/bin/node" --strip-components=2
+          mv ./node ./release-standalone/lib/node
+
+      - name: Get and set VERSION
+        run: |
+          TAG="${{ inputs.release_tag }}"
+          echo "VERSION=${TAG#v}" >> $GITHUB_ENV
+
+      - name: Package
+        env:
+          VERSION: ${{ env.VERSION }}
+        run: npm run package amd64
+
+      - name: Verify tarball
+        run: |
+          TARBALL=$(ls release-packages/*linux-amd64.tar.gz)
+          echo "Tarball: $TARBALL"
+          ls -lh "$TARBALL"
+          tar -tzf "$TARBALL" | grep 'bin/code-server'
+          # Verify bundled node is Linux x64
+          tar -xzf "$TARBALL" --include='*/lib/node' -C /tmp
+          file /tmp/*/lib/node
+
+      - name: Upload to release
+        run: |
+          TARBALL=$(ls release-packages/*linux-amd64.tar.gz)
+          # Delete existing asset if present
+          gh release delete-asset "${{ inputs.release_tag }}" \
+            "code-server-local-linux-amd64.tar.gz" \
+            --repo ${{ github.repository }} --yes 2>/dev/null || true
+          # Upload as code-server-local-linux-amd64.tar.gz
+          cp "$TARBALL" release-packages/code-server-local-linux-amd64.tar.gz
+          gh release upload "${{ inputs.release_tag }}" \
+            release-packages/code-server-local-linux-amd64.tar.gz \
+            --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
